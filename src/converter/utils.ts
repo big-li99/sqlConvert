@@ -95,3 +95,20 @@ export function generateTriggerName(tableName: string, columnName: string): stri
   const c = stripQuotes(columnName).toUpperCase();
   return `TRG_${t}_${c}`;
 }
+
+/**
+ * 生成 schema 唯一的索引名：前缀加上表名
+ */
+export function makeUniqueIndexName(idxName: string, tblName: string, logs: { type: 'info' | 'warning' | 'error' | 'success'; message: string }[]): string {
+  const cleanIdx = idxName.replace(/^"/, '').replace(/"$/, '');
+  const cleanTbl = tblName.replace(/^"/, '').replace(/"$/, '');
+  if (cleanIdx.toUpperCase().startsWith(cleanTbl.toUpperCase() + '_')) {
+    return idxName;
+  }
+  const newName = `${tblName}_${idxName}`;
+  logs.push({
+    type: 'info',
+    message: `索引名已添加表名前缀以保证 schema 唯一：${idxName} -> ${newName}`,
+  });
+  return newName;
+}

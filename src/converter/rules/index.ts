@@ -1,17 +1,19 @@
 import type { ConversionLog, ConverterOptions } from '../../types';
-import { convertIdentifier } from '../utils';
+import { convertDataType } from './dataTypes';
+import { convertIdentifier, makeUniqueIndexName } from '../utils';
 
 /**
  * 转换 CREATE INDEX / DROP INDEX
  */
-export function convertIndex(sql: string, options: ConverterOptions, _logs: ConversionLog[]): string {
+export function convertIndex(sql: string, options: ConverterOptions, logs: ConversionLog[]): string {
   // CREATE INDEX
   const createMatch = sql.match(/CREATE\s+(UNIQUE\s+)?(BITMAP\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(`?[^`\s]+`?)\s+ON\s+(`?[^`\s]+`?)\s*\(([^)]+)\)/i);
   if (createMatch) {
-    const unique = createMatch[1] || '';
-    const bitmap = createMatch[2] || '';
-    const idxName = convertIdentifier(createMatch[3], options.preserveCase);
+    const unique = (createMatch[1] || '').trim().toUpperCase();
+    const bitmap = (createMatch[2] || '').trim().toUpperCase();
+    let idxName = convertIdentifier(createMatch[3], options.preserveCase);
     const tblName = convertIdentifier(createMatch[4], options.preserveCase);
+    idxName = makeUniqueIndexName(idxName, tblName, logs);
     const cols = createMatch[5].split(',').map((c) => {
       // 保留函数索引
       const trimmed = c.trim();
@@ -19,13 +21,18 @@ export function convertIndex(sql: string, options: ConverterOptions, _logs: Conv
     }).join(', ');
 
     // 移除 USING BTREE / USING HASH
-    return `CREATE ${unique}${bitmap}INDEX ${idxName} ON ${tblName}(${cols});`;
+    const keywords = [unique, bitmap].filter(Boolean).join(' ');
+    return `CREATE ${keywords ? keywords + ' ' : ''}INDEX ${idxName} ON ${tblName}(${cols});`;
   }
 
   // DROP INDEX
   const dropMatch = sql.match(/DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?(`?[^`\s]+`?)\s+(?:ON\s+(`?[^`\s]+`?))?/i);
   if (dropMatch) {
-    const idxName = convertIdentifier(dropMatch[1], options.preserveCase);
+    let idxName = convertIdentifier(dropMatch[1], options.preserveCase);
+    const tblName = dropMatch[2] ? convertIdentifier(dropMatch[2], options.preserveCase) : '';
+    if (tblName) {
+      idxName = makeUniqueIndexName(idxName, tblName, logs);
+    }
     // Oracle 不需要 ON table
     return `DROP INDEX ${idxName};`;
   }
@@ -45,6 +52,38 @@ export function convertAlterTable(sql: string, options: ConverterOptions, logs: 
 
   // ADD COLUMN -> ADD
   action = action.replace(/\bADD\s+COLUMN\b/gi, 'ADD');
+
+  // 处理 ADD [IF NOT EXISTS] col_name type ...
+  const addMatch = action.match(/\bADD\s+(?:IF\s+NOT\s+EXISTS\s+)?(`?[^`\s]+`?)\s+(.+)/i);
+  if (addMatch) {
+    const colNameRaw = addMatch[1];
+    let colDef = addMatch[2];
+    const colName = convertIdentifier(colNameRaw, options.preserveCase);
+
+    // 提取注释
+    const commentMatch = colDef.match(/\bCOMMENT\s+'([^']*)'/i);
+    let comment = '';
+    if (commentMatch) {
+      comment = commentMatch[1];
+      colDef = colDef.replace(/\s*COMMENT\s+'[^']*'/i, '').trim();
+    }
+
+    // 移除 COLLATE
+    colDef = colDef.replace(/\s*COLLATE\s+\S+/gi, '');
+    // 移除 CHARACTER SET
+    colDef = colDef.replace(/\s*CHARACTER\s+SET\s+\S+/gi, '');
+    // 移除 AFTER column（Oracle 不支持）
+    colDef = colDef.replace(/\s+AFTER\s+(`?[^`\s]+`?)/gi, '');
+
+    // 转换数据类型
+    colDef = convertDataType(colDef, logs);
+
+    const alterLine = `ALTER TABLE ${tableName} ADD ${colName} ${colDef};`;
+    if (comment && options.addComments) {
+      return `${alterLine}\n\nCOMMENT ON COLUMN ${tableName}.${colName} IS '${comment}';`;
+    }
+    return alterLine;
+  }
 
   // DROP COLUMN -> DROP
   action = action.replace(/\bDROP\s+COLUMN\b/gi, 'DROP');

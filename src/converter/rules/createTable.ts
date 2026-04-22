@@ -1,6 +1,6 @@
 import type { ConversionLog, ConverterOptions } from '../../types';
 import { convertDataType } from './dataTypes';
-import { convertIdentifier, generateSequenceName, generateTriggerName, stripQuotes } from '../utils';
+import { convertIdentifier, generateSequenceName, generateTriggerName, makeUniqueIndexName, stripQuotes } from '../utils';
 
 interface ParsedColumn {
   name: string;
@@ -270,7 +270,8 @@ export function convertCreateTable(sql: string, options: ConverterOptions, logs:
         const name = ukMatch[1];
         const cols = ukMatch[2].split(',').map((c) => convertIdentifier(c.trim(), options.preserveCase)).join(', ');
         if (name) {
-          afterLines.push(`ALTER TABLE ${tableName} ADD CONSTRAINT ${convertIdentifier(name, options.preserveCase)} UNIQUE (${cols});`);
+          const ukName = makeUniqueIndexName(convertIdentifier(name, options.preserveCase), tableName, logs);
+          afterLines.push(`ALTER TABLE ${tableName} ADD CONSTRAINT ${ukName} UNIQUE (${cols});`);
         } else {
           afterLines.push(`ALTER TABLE ${tableName} ADD CONSTRAINT uk_${stripQuotes(tableNameRaw).toLowerCase()}_${stripQuotes(cols.split(',')[0].trim()).toLowerCase()} UNIQUE (${cols});`);
         }
@@ -281,7 +282,8 @@ export function convertCreateTable(sql: string, options: ConverterOptions, logs:
         const name = idxMatch[1];
         const cols = idxMatch[2].split(',').map((c) => convertIdentifier(c.trim(), options.preserveCase)).join(', ');
         if (name) {
-          afterLines.push(`CREATE INDEX ${convertIdentifier(name, options.preserveCase)} ON ${tableName}(${cols});`);
+          const idxName = makeUniqueIndexName(convertIdentifier(name, options.preserveCase), tableName, logs);
+          afterLines.push(`CREATE INDEX ${idxName} ON ${tableName}(${cols});`);
         } else {
           afterLines.push(`CREATE INDEX idx_${stripQuotes(tableNameRaw).toLowerCase()}_${stripQuotes(cols.split(',')[0].trim()).toLowerCase()} ON ${tableName}(${cols});`);
         }
@@ -296,7 +298,8 @@ export function convertCreateTable(sql: string, options: ConverterOptions, logs:
           message: `FULLTEXT 索引 ${name || ''} 在 Oracle 中需要使用 Oracle Text (CTXSYS)，已转为普通索引`,
         });
         if (name) {
-          afterLines.push(`CREATE INDEX ${convertIdentifier(name, options.preserveCase)} ON ${tableName}(${cols});`);
+          const ftIdxName = makeUniqueIndexName(convertIdentifier(name, options.preserveCase), tableName, logs);
+          afterLines.push(`CREATE INDEX ${ftIdxName} ON ${tableName}(${cols});`);
         }
       }
     } else if (upper.startsWith('CONSTRAINT') || upper.startsWith('FOREIGN KEY')) {
@@ -329,10 +332,10 @@ export function convertCreateTable(sql: string, options: ConverterOptions, logs:
   }
 
   // 提取表注释
-  const tableCommentMatch = tableTail.match(/\bCOMMENT\s*=\s*'([^']*)'/i);
+  const tableCommentMatch = tableTail.match(/\bCOMMENT\s*(?:=\s*)?'([^']*)'/i);
   if (tableCommentMatch && options.addComments) {
     commentLines.unshift(`COMMENT ON TABLE ${tableName} IS '${tableCommentMatch[1]}';`);
-    tableTail = tableTail.replace(/\s*COMMENT\s*=\s*'[^']*'/i, '');
+    tableTail = tableTail.replace(/\s*COMMENT\s*(?:=\s*)?'[^']*'/i, '');
   }
   // 清理尾部多余逗号和空格
   tableTail = tableTail.replace(/,\s*\)/g, ')').replace(/\s+/g, ' ').trim();

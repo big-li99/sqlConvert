@@ -7,63 +7,50 @@ import { convertPartition } from './rules/partition';
 import { convertDML } from './rules/dml';
 import { convertComment, convertDrop, convertTruncate, convertView } from './rules/comments';
 import { convertProcedure, convertSequence } from './rules/others';
+import { applyCustomRules } from './customRules';
 
 /**
  * 判断语句类型并路由到对应的转换器
  */
 function convertStatement(sql: string, options: ConverterOptions, logs: ConversionLog[]): string {
   const trimmed = sql.trim().toUpperCase();
+  let result: string;
 
   if (trimmed.startsWith('CREATE TABLE')) {
-    return convertCreateTable(sql, options, logs);
+    result = convertCreateTable(sql, options, logs);
+  } else if ((trimmed.startsWith('CREATE') && /\bINDEX\b/i.test(sql)) || trimmed.startsWith('DROP INDEX')) {
+    result = convertIndex(sql, options, logs);
+  } else if (trimmed.startsWith('ALTER TABLE')) {
+    result = convertAlterTable(sql, options, logs);
+  } else if (trimmed.startsWith('CREATE') && /PARTITION\s+BY/i.test(sql)) {
+    result = convertPartition(sql, options, logs);
+  } else if (trimmed.startsWith('CREATE') && /VIEW/i.test(sql)) {
+    result = convertView(sql, options, logs);
+  } else if (trimmed.startsWith('CREATE') && /PROCEDURE|FUNCTION/i.test(sql)) {
+    result = convertProcedure(sql, options, logs);
+  } else if (trimmed.startsWith('CREATE') && /SEQUENCE/i.test(sql)) {
+    result = convertSequence(sql, options, logs);
+  } else if (trimmed.startsWith('DROP TABLE') || trimmed.startsWith('DROP TEMPORARY TABLE')) {
+    result = convertDrop(sql, options, logs);
+  } else if (trimmed.startsWith('TRUNCATE')) {
+    result = convertTruncate(sql, options, logs);
+  } else if (trimmed.startsWith('INSERT') || trimmed.startsWith('UPDATE') || trimmed.startsWith('DELETE') || trimmed.startsWith('SELECT')) {
+    result = convertDML(sql, options, logs);
+  } else if (trimmed.startsWith('COMMENT')) {
+    result = convertComment(sql, options, logs);
+  } else {
+    // 对于无法识别的语句，只转换标识符
+    logs.push({
+      type: 'warning',
+      message: `未识别语句类型，仅进行基本标识符转换`,
+    });
+    result = sql.replace(/`([^`]+)`/g, (_, id) => `"${id}"`.toUpperCase());
   }
 
-  if (trimmed.startsWith('CREATE INDEX') || trimmed.startsWith('DROP INDEX')) {
-    return convertIndex(sql, options, logs);
-  }
+  // 应用用户自定义规则
+  result = applyCustomRules(result, logs);
 
-  if (trimmed.startsWith('ALTER TABLE')) {
-    return convertAlterTable(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('CREATE') && /PARTITION\s+BY/i.test(sql)) {
-    return convertPartition(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('CREATE') && /VIEW/i.test(sql)) {
-    return convertView(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('CREATE') && /PROCEDURE|FUNCTION/i.test(sql)) {
-    return convertProcedure(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('CREATE') && /SEQUENCE/i.test(sql)) {
-    return convertSequence(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('DROP TABLE') || trimmed.startsWith('DROP TEMPORARY TABLE')) {
-    return convertDrop(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('TRUNCATE')) {
-    return convertTruncate(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('INSERT') || trimmed.startsWith('UPDATE') || trimmed.startsWith('DELETE') || trimmed.startsWith('SELECT')) {
-    return convertDML(sql, options, logs);
-  }
-
-  if (trimmed.startsWith('COMMENT')) {
-    return convertComment(sql, options, logs);
-  }
-
-  // 对于无法识别的语句，只转换标识符
-  logs.push({
-    type: 'warning',
-    message: `未识别语句类型，仅进行基本标识符转换`,
-  });
-  return sql.replace(/`([^`]+)`/g, (_, id) => `"${id}"`.toUpperCase());
+  return result;
 }
 
 /**
@@ -100,7 +87,11 @@ export function convertSQL(input: string, options: ConverterOptions = DEFAULT_OP
     try {
       const converted = convertStatement(stmt, options, logs);
       if (converted && converted.trim()) {
-        outputs.push(converted);
+        let normalized = converted.trim();
+        if (!normalized.endsWith(';')) {
+          normalized += ';';
+        }
+        outputs.push(normalized);
         stats.convertedStatements++;
       }
     } catch (err) {

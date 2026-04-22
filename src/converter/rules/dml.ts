@@ -8,6 +8,12 @@ export function convertDML(sql: string, options: ConverterOptions, logs: Convers
   let result = sql;
   const upper = sql.toUpperCase().trim();
 
+  // INSERT IGNORE -> INSERT（Oracle 不支持 IGNORE）
+  if (/\bINSERT\s+IGNORE\b/i.test(result)) {
+    result = result.replace(/\bINSERT\s+IGNORE\b/i, 'INSERT');
+    logs.push({ type: 'info', message: '移除 INSERT IGNORE 中的 IGNORE 关键字' });
+  }
+
   // INSERT SET 语法 -> 标准 INSERT VALUES
   if (upper.startsWith('INSERT') && /\bSET\b/i.test(sql)) {
     const match = sql.match(/INSERT\s+(?:INTO\s+)?(`?[^`\s]+`?)\s+SET\s+(.+)/i);
@@ -114,6 +120,35 @@ export function convertDML(sql: string, options: ConverterOptions, logs: Convers
   result = result.replace(/\bTRUNCATE\s*\(/gi, 'TRUNC(');
   result = result.replace(/\bDATE_FORMAT\s*\(([^,]+),\s*'([^']+)'\s*\)/gi, "TO_CHAR($1, '$2')");
   result = result.replace(/\bSTR_TO_DATE\s*\(([^,]+),\s*'([^']+)'\s*\)/gi, "TO_DATE($1, '$2')");
+
+  // 日期时间字符串常量 -> TO_DATE（必须先匹配完整日期时间，再匹配纯日期）
+  // 先保护已有的 TO_DATE 调用，避免二次替换
+  const toDateCalls: string[] = [];
+  result = result.replace(/TO_DATE\s*\([^)]+\)/gi, (match) => {
+    toDateCalls.push(match);
+    return `__TO_DATE_${toDateCalls.length - 1}__`;
+  });
+
+  let hasDateConversion = false;
+  result = result.replace(/'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})'/g, (_, dt) => {
+    hasDateConversion = true;
+    return `TO_DATE('${dt}', 'YYYY-MM-DD HH24:MI:SS')`;
+  });
+  result = result.replace(/'(\d{4}-\d{2}-\d{2})'/g, (_, d) => {
+    hasDateConversion = true;
+    return `TO_DATE('${d}', 'YYYY-MM-DD')`;
+  });
+  result = result.replace(/'(\d{2}:\d{2}:\d{2})'/g, (_, t) => {
+    hasDateConversion = true;
+    return `TO_DATE('${t}', 'HH24:MI:SS')`;
+  });
+
+  // 还原 TO_DATE 调用
+  result = result.replace(/__TO_DATE_(\d+)__/g, (_, idx) => toDateCalls[parseInt(idx)]);
+
+  if (hasDateConversion) {
+    logs.push({ type: 'info', message: '将日期/时间字符串常量转换为 TO_DATE 函数' });
+  }
 
   // 转换标识符
   result = result.replace(/`([^`]+)`/g, (_, id) => convertIdentifier(id, options.preserveCase));
