@@ -157,6 +157,8 @@ export const customRules: CustomRule[] = [
   // 批量配置 NULL 替换规则（新增规则只需添加一行）
   nullReplacementRule('SYS_INDEXS', 'F_CHDATE', 'SYSDATE'),
   nullReplacementRule('SYS_DCT_CST', 'F_CHDATE', 'SYSDATE'),
+  nullReplacementRule('SYS_INDEXS', 'F_CHDATE', 'SYSDATE'),
+  nullReplacementRule('SYS_INDEXS', 'F_CRDATE', 'SYSDATE')
 
   // 在此添加更多自定义规则...
   // nullReplacementRule('OTHER_TABLE', 'SOME_COL', "' '"),

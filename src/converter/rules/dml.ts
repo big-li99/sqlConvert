@@ -121,15 +121,20 @@ export function convertDML(sql: string, options: ConverterOptions, logs: Convers
   result = result.replace(/\bDATE_FORMAT\s*\(([^,]+),\s*'([^']+)'\s*\)/gi, "TO_CHAR($1, '$2')");
   result = result.replace(/\bSTR_TO_DATE\s*\(([^,]+),\s*'([^']+)'\s*\)/gi, "TO_DATE($1, '$2')");
 
-  // 日期时间字符串常量 -> TO_DATE（必须先匹配完整日期时间，再匹配纯日期）
-  // 先保护已有的 TO_DATE 调用，避免二次替换
-  const toDateCalls: string[] = [];
-  result = result.replace(/TO_DATE\s*\([^)]+\)/gi, (match) => {
-    toDateCalls.push(match);
-    return `__TO_DATE_${toDateCalls.length - 1}__`;
+  // 日期时间字符串常量 -> TO_DATE / TO_TIMESTAMP（必须先匹配完整日期时间，再匹配纯日期）
+  // 先保护已有的 TO_DATE / TO_TIMESTAMP 调用，避免二次替换
+  const protectedCalls: string[] = [];
+  result = result.replace(/TO_(?:DATE|TIMESTAMP)\s*\([^)]+\)/gi, (match) => {
+    protectedCalls.push(match);
+    return `__PROTECTED_${protectedCalls.length - 1}__`;
   });
 
   let hasDateConversion = false;
+  // 带毫秒/微秒的日期时间 -> TO_TIMESTAMP（必须先于不带毫秒的匹配）
+  result = result.replace(/'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+)'/g, (_, dt) => {
+    hasDateConversion = true;
+    return `TO_TIMESTAMP('${dt}', 'YYYY-MM-DD HH24:MI:SS.FF6')`;
+  });
   result = result.replace(/'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})'/g, (_, dt) => {
     hasDateConversion = true;
     return `TO_DATE('${dt}', 'YYYY-MM-DD HH24:MI:SS')`;
@@ -143,11 +148,11 @@ export function convertDML(sql: string, options: ConverterOptions, logs: Convers
     return `TO_DATE('${t}', 'HH24:MI:SS')`;
   });
 
-  // 还原 TO_DATE 调用
-  result = result.replace(/__TO_DATE_(\d+)__/g, (_, idx) => toDateCalls[parseInt(idx)]);
+  // 还原保护的函数调用
+  result = result.replace(/__PROTECTED_(\d+)__/g, (_, idx) => protectedCalls[parseInt(idx)]);
 
   if (hasDateConversion) {
-    logs.push({ type: 'info', message: '将日期/时间字符串常量转换为 TO_DATE 函数' });
+    logs.push({ type: 'info', message: '将日期/时间字符串常量转换为 TO_DATE / TO_TIMESTAMP 函数' });
   }
 
   // 转换标识符

@@ -42,7 +42,7 @@ const TYPE_MAP: Record<string, string | ((match: string, args?: string) => strin
 
   // 日期时间类型
   'DATE': () => 'DATE',
-  'DATETIME': () => 'DATE',
+  'DATETIME': (_m: string, args?: string) => args ? `TIMESTAMP${args}` : 'DATE',
   'TIMESTAMP': (_m: string, args?: string) => args ? `TIMESTAMP${args}` : 'TIMESTAMP',
   'TIME': () => 'INTERVAL DAY TO SECOND',
   'YEAR': () => 'NUMBER(4)',
