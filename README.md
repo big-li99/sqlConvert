@@ -38,3 +38,41 @@ React 19 + TypeScript + Vite + Monaco Editor
 - **UI 交互** 与 **转换逻辑** 清晰分离，便于维护与扩展
 - 使用 **Monaco Editor** 提供专业的代码编辑体验
 - **TypeScript** 保证类型安全与开发效率
+
+## 🚀 快速开始
+
+### 环境要求
+
+- **Node.js** >= 18.0.0
+- **pnpm** / **npm** / **yarn** (任一包管理器)
+
+### 安装与启动
+
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd sqlConvert
+
+# 2. 安装依赖
+pnpm install
+# 或使用 npm install / yarn install
+
+# 3. 启动开发服务器
+pnpm dev
+# 或使用 npm run dev / yarn dev
+```
+
+启动成功后，浏览器会自动打开 `http://localhost:5173`（Vite 默认端口）。
+
+### 其他命令
+
+```bash
+# 构建生产版本
+pnpm build
+
+# 预览生产构建
+pnpm preview
+
+# 代码检查
+pnpm lint
+```
