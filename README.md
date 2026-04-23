@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# 🔄 SQL Convert: MySQL → Oracle
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)
+![License](https://img.shields.io/badge/License-MIT-green)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)
+![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite)
 
-Currently, two official plugins are available:
+> 🌊 专注于将 MySQL 语法转换为 Oracle 语法，特别适用于 **OceanBase MySQL 模式** 向 **OceanBase Oracle 模式** 的迁移与适配场景。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📖 项目概述
 
-## React Compiler
+本项目是一个基于现代化前端技术栈的 SQL 转换工具，提供直观的编辑器界面、可配置的转换选项、详细的转换日志与统计信息，帮助用户高效完成数据库迁移任务。
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🎯 核心目标
 
-## Expanding the ESLint configuration
+将 MySQL 语法转换为兼容 Oracle 的 SQL，支持常见 DDL/DML 语句及数据类型映射，并提供可扩展的自定义规则机制。
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## ✨ 主要特性
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| 特性 | 说明 |
+|------|------|
+| 🔀 **多语句处理** | 支持多语句拆分与逐条转换 |
+| 🔄 **数据类型映射** | 自动转换 MySQL 到 Oracle 数据类型 |
+| 💬 **注释转换** | 智能转换 SQL 注释语法 |
+| 🔢 **自增列替代** | 支持 IDENTITY 或 SEQUENCE+TRIGGER 方案 |
+| 📝 **DML 语法适配** | 处理 LIMIT、函数替换等语法差异 |
+| 🎛️ **可视化设置** | 提供设置面板与实时日志统计 |
+| 📁 **文件操作** | 支持导入导出与快捷操作 |
+| 🔌 **可扩展架构** | 支持自定义转换规则 |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🏗️ 技术架构
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+React 19 + TypeScript + Vite + Monaco Editor
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- **UI 交互** 与 **转换逻辑** 清晰分离，便于维护与扩展
+- 使用 **Monaco Editor** 提供专业的代码编辑体验
+- **TypeScript** 保证类型安全与开发效率
